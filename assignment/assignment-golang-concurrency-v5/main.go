@@ -63,6 +63,7 @@ func ProcessGetTLD(website RowData, ch chan RowData, chErr chan error) {
 		Valid:       website.Valid,
 		RefIPs:      website.RefIPs,
 	}
+
 }
 
 // Gunakan variable ini sebagai goroutine di fungsi FilterAndGetDomain
@@ -85,6 +86,7 @@ func FilterAndFillData(TLD string, data []RowData) ([]RowData, error) {
 			filteredData = append(filteredData, website)
 		}
 	}
+
 	time.Sleep(100 * time.Millisecond)
 
 	return filteredData, nil // TODO: replace this
