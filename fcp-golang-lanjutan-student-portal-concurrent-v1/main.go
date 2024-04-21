@@ -192,17 +192,35 @@ func (sm *InMemoryStudentManager) ImportStudents(filenames []string) error {
 	sm.Lock()
 	defer sm.Unlock()
 
+	var wg sync.WaitGroup
+	errChan := make(chan error, len(filenames))
+
 	for _, filename := range filenames {
-		students, err := ReadStudentsFromCSV(filename)
+		wg.Add(1)
+		go func(filename string) {
+			defer wg.Done()
+			students, err := ReadStudentsFromCSV(filename)
+			if err != nil {
+				errChan <- err
+				return
+			} else {
+				sm.students = append(sm.students, students...)
+			}
+		}(filename)
+	}
+
+	wg.Wait()
+	close(errChan)
+
+	var firstErr error
+	for err := range errChan {
 		if err != nil {
 			return err
 		}
-		sm.students = append(sm.students, students...)
 	}
 
 	time.Sleep(30 * time.Millisecond)
-
-	return nil // TODO: replace this
+	return firstErr
 }
 
 func (sm *InMemoryStudentManager) SubmitAssignmentLongProcess() {
@@ -215,8 +233,28 @@ func (sm *InMemoryStudentManager) SubmitAssignments(numAssignments int) {
 	start := time.Now()
 
 	// TODO: answer here
-	time.Sleep(100 * time.Millisecond)
-	sm.SubmitAssignmentLongProcess()
+	jobs := make(chan int, numAssignments)
+
+	var wg sync.WaitGroup
+	wg.Add(3)
+
+	for i := 0; i < 3; i++ {
+		go func() {
+			defer wg.Done()
+			for job := range jobs {
+				sm.SubmitAssignmentLongProcess()
+				fmt.Printf("Submitted assignment %d\n", job)
+			}
+		}()
+	}
+
+	for i := 0; i < numAssignments; i++ {
+		jobs <- i
+	}
+
+	close(jobs)
+
+	wg.Wait()
 
 	elapsed := time.Since(start)
 	fmt.Printf("Submitting %d assignments took %s\n", numAssignments, elapsed)
